@@ -1,4 +1,4 @@
-# Placeholder Plugin
+# placeholder
 
 A Neovim plugin that detects the language of the current file and adds a
 VSCode-style debug configuration to `.vscode/launch.json`.
@@ -16,3 +16,4 @@ use {
     })
   end
 }
+```
