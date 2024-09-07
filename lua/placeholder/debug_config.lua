@@ -37,6 +37,34 @@ local function detect_language()
 	return vim.bo.filetype
 end
 
+-- Map of filetypes to DAP configuration types
+local dap_config_types = {
+	python = "python",
+	javascript = "pwa-node",
+	typescript = "pwa-node",
+	go = "go",
+	cpp = "cppdbg",
+	c = "cppdbg",
+	rust = "lldb",
+	java = "java",
+	php = "php",
+	lua = "lua",
+	ruby = "ruby",
+	cs = "coreclr",
+	dart = "dart",
+	elixir = "elixir",
+	haskell = "haskell",
+	kotlin = "java",
+	swift = "lldb",
+	powershell = "PowerShell",
+	perl = "perl",
+	zig = "lldb",
+	d = "cppdbg",
+	fortran = "cppdbg",
+	erlang = "erlang",
+	ocaml = "ocaml",
+}
+
 -- Find the root of the project by searching for the .git directory
 local function find_git_root()
 	local path = vim.fn.expand("%:p:h")
@@ -51,13 +79,21 @@ end
 
 -- Function to add a language-specific debug configuration to launch.json
 local function add_debug_configuration_for_language(language)
-	local bf_path = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
+	local dap_type = dap_config_types[language]
 
+	if not dap_type then
+		-- If it doesn't exist, return an error
+		print("Error: No DAP configuration found for " .. language)
+		return
+	end
+
+	local bp = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
 	return {
-		name = string.format("%s: %s", capitalize(language), bf_path),
-		type = language,
+		name = string.format("%s: %s", capitalize(language), bp),
+		type = dap_type,
 		request = "launch",
-		program = string.format("${workspaceFolder}/%s", bf_path),
+		program = string.format("${workspaceFolder}/%s", bp),
+		args = {},
 		console = "integratedTerminal",
 	}
 end
