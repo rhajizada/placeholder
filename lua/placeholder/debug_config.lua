@@ -51,11 +51,13 @@ end
 
 -- Function to add a language-specific debug configuration to launch.json
 local function add_debug_configuration_for_language(language)
+	local bf_path = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
+
 	return {
-		name = string.format("%s: Current File", capitalize(language)),
+		name = string.format("%s: %s", capitalize(language), bf_path),
 		type = language,
 		request = "launch",
-		program = "${file}",
+		program = string.format("${workspaceFolder}/%s", bf_path),
 		console = "integratedTerminal",
 	}
 end
