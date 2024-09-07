@@ -1,162 +1,147 @@
 local M = {}
 
--- Detect the language of the current open file
+-- Setup function for the plugin
+function M.setup()
+	-- Check if prettier is installed using vim.fn.executable
+	if vim.fn.executable("jq") == 0 then
+		-- If jq is not found, throw an error message
+		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Please install 'jq' to use this plugin.")
+		return
+	end
+
+	print("Plugin setup complete")
+end
+
+-- Helper function to capitalize strings
+local function capitalize(str)
+	return (str:sub(1, 1):upper() .. str:sub(2))
+end
+
+-- Function to format JSON using Prettier
+local function format_json_file(launch_json_path)
+	-- Check if prettier is available before running the formatting command
+	if vim.fn.executable("jq") == 1 then
+		-- Format the launch.json file using jq
+		vim.cmd("edit " .. launch_json_path)
+		-- Run :%!jq to format the content with jq
+		vim.cmd("%!jq")
+		print("Formatted launch.json")
+	else
+		-- Error message if prettier is not installed
+		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Cannot format JSON.")
+	end
+end
+
+-- Function to detect the current file's language
 local function detect_language()
 	return vim.bo.filetype
 end
 
--- Check if a file exists
-local function file_exists(path)
-	local f = io.open(path, "r")
-	if f ~= nil then
-		io.close(f)
-		return true
-	else
-		return false
-	end
-end
-
--- Find the project root based on .git or fallback to Neovim's initial argument
-local function find_project_root()
-	-- Try to find .git directory first and stop at the first match
-	local git_root = vim.fn.finddir(".git", ".;")
-	if git_root and git_root ~= "" then
-		return vim.fn.fnamemodify(git_root, ":h")
-	end
-
-	-- If no .git directory, fallback to the first argument passed to Neovim
-	if vim.fn.argc() > 0 then
-		return vim.fn.fnamemodify(vim.fn.argv(0), ":p:h")
-	end
-
-	-- Fallback to the current working directory
-	return vim.fn.getcwd()
-end
-
--- Create a directory if it doesn't exist
-local function create_directory_if_needed(dir_path)
-	if vim.fn.isdirectory(dir_path) == 0 then
-		local result = vim.fn.mkdir(dir_path, "p")
-		if result == 0 then
-			print("Failed to create directory: " .. dir_path)
-			return false
-		else
-			print("Directory created: " .. dir_path)
-			return true
+-- Find the root of the project by searching for the .git directory
+local function find_git_root()
+	local path = vim.fn.expand("%:p:h")
+	while path and path ~= "" do
+		if vim.fn.isdirectory(path .. "/.git") == 1 then
+			return path
 		end
-	else
-		return true -- Directory already exists
+		path = vim.fn.fnamemodify(path, ":h")
 	end
+	return nil -- No .git directory found, fallback logic can be applied
 end
 
--- Create the .vscode/launch.json file in the project root if it doesn't exist
-local function create_launch_json_if_needed()
-	local root_path = find_project_root() .. "/.vscode"
-	local path = root_path .. "/launch.json"
-
-	-- Ensure the .vscode directory exists or is created
-	if not create_directory_if_needed(root_path) then
-		return false
-	end
-
-	-- Check if the launch.json file already exists
-	if file_exists(path) then
-		return true -- File already exists, no need to create
-	end
-
-	-- Now try to create the launch.json file
-	local file, err = io.open(path, "w")
-	if not file then
-		print("Error opening or creating launch.json: " .. err)
-		return false
-	end
-
-	-- Write the initial structure of launch.json
-	file:write([[{
-  "version": "0.2.0",
-  "configurations": []
-}]])
-	file:close()
-
-	print("launch.json created successfully at: " .. path)
-	return true
-end
-
--- Add Python debug configuration
-local function add_python_debug_configuration()
-	local root_path = find_project_root() .. "/.vscode/launch.json"
-
-	-- Check if the file exists before trying to open it
-	if not file_exists(root_path) then
-		print("Error: launch.json does not exist. Please run 'create_launch_json_if_needed()' first.")
-		return
-	end
-
-	-- Open the file for reading
-	local file, err = io.open(root_path, "r")
-	if not file then
-		print("Error opening file for reading: " .. err)
-		return
-	end
-
-	-- Read the entire content of the launch.json
-	local content = file:read("*a")
-	file:close()
-
-	-- Decode the JSON content into a Lua table
-	local launch_data = vim.fn.json_decode(content)
-
-	-- Ensure there is a "configurations" list in the file
-	if not launch_data.configurations then
-		print("Error: Configurations list not found in launch.json")
-		return
-	end
-
-	-- Define the new Python configuration
-	local new_config = {
-		name = "Python: Current File",
-		type = "python",
+-- Function to add a language-specific debug configuration to launch.json
+local function add_debug_configuration_for_language(language)
+	return {
+		name = string.format("%s: Current File", capitalize(language)),
+		type = language,
 		request = "launch",
 		program = "${file}",
 		console = "integratedTerminal",
 	}
+end
 
-	-- Add the new configuration to the "configurations" list
-	table.insert(launch_data.configurations, new_config)
+-- Function to add a debug configuration to launch.json
+local function add_debug_configuration()
+	local project_root = find_git_root() or vim.fn.getcwd() -- Fallback to current working directory if no .git found
+	local vscode_dir = project_root .. "/.vscode"
+	local launch_json_path = vscode_dir .. "/launch.json"
 
-	-- Encode the Lua table back into JSON format
-	local new_content = vim.fn.json_encode(launch_data)
+	-- Ensure the .vscode directory exists
+	if vim.fn.isdirectory(vscode_dir) == 0 then
+		local ok, err = vim.fn.mkdir(vscode_dir, "p")
+		if ok == 0 then
+			print("Error creating .vscode directory: " .. err)
+			return
+		end
+	end
 
-	-- Open the file for writing and update it with the new configuration
-	file, err = io.open(root_path, "w")
+	-- Try to open the launch.json file
+	local file, err = io.open(launch_json_path, "r")
+	if not file then
+		-- If the file doesn't exist, create it with default content
+		file, err = io.open(launch_json_path, "w")
+		if not file then
+			print("Error creating launch.json: " .. err)
+			return
+		end
+		file:write([[{
+  "version": "0.2.0",
+  "configurations": []
+}]])
+		file:close()
+		-- Reopen the file for reading after creation
+		file, err = io.open(launch_json_path, "r")
+		if not file then
+			print("Error reopening launch.json after creation: " .. err)
+			return
+		end
+	end
+
+	-- Read the file content
+	local content = file:read("*a")
+	file:close()
+
+	-- Decode JSON content
+	local launch_data = vim.json.decode(content)
+
+	-- Ensure "configurations" exists in the JSON
+	if not launch_data.configurations then
+		launch_data.configurations = {}
+	end
+
+	-- Detect the current file's language
+	local language = detect_language()
+
+	-- Get the language-specific debug configuration
+	local debug_config = add_debug_configuration_for_language(language)
+	if debug_config then
+		-- Add the debug configuration
+		table.insert(launch_data.configurations, debug_config)
+	else
+		return -- If no debug configuration was added, return early
+	end
+
+	-- Encode JSON content
+	local updated_content = vim.json.encode(launch_data)
+
+	-- Write the updated JSON content back to the file
+	file, err = io.open(launch_json_path, "w")
 	if not file then
 		print("Error opening file for writing: " .. err)
 		return
 	end
-
-	file:write(new_content)
+	file:write(updated_content)
 	file:close()
 
-	print("Python debug configuration added to launch.json.")
+	-- Format the launch.json file using Prettier
+	format_json_file(launch_json_path)
+
+	print(language .. " debug configuration added to " .. launch_json_path)
 end
 
--- Main function to add debug configuration based on language
+-- Main function to trigger adding the debug configuration
 function M.add_debug_configuration()
-	-- Ensure the launch.json file exists or is created
-	if not create_launch_json_if_needed() then
-		print("Failed to create or access launch.json")
-		return
-	end
-
-	-- Detect the language of the current file
-	local language = detect_language()
-
-	-- Add a debug configuration based on the detected language
-	if language == "python" or language == "lua" then
-		add_python_debug_configuration()
-	else
-		print("Language not supported yet!")
-	end
+	add_debug_configuration()
 end
 
 return M
