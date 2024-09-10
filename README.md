@@ -12,7 +12,7 @@ use {
   'rhajizada/placeholder',
   config = function()
     require('placeholder').setup({
-      keymap = "<leader>cj" -- Customize keymap (optional)
+      keymap = "<leader>dj" -- Customize keymap (optional)
     })
   end
 }

@@ -21,12 +21,11 @@ function M.setup(user_config)
 		local wk = require("which-key")
 
 		-- Optionally configure which-key (can be removed if not needed)
-		wk.setup({})
+		wk.setup({
+			{ "<leader>dj", desc = "Add debug configuration" },
+		})
 
 		-- Register the label for the keybinding in which-key
-		wk.register({
-			[config.options.keymap] = { "Add debug configuration" },
-		}, { mode = "n" }) -- Register for normal mode
 	end
 end
 
