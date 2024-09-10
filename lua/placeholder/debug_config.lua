@@ -1,35 +1,16 @@
 local M = {}
 
 -- Setup function for the plugin
-function M.setup()
-	-- Check if prettier is installed using vim.fn.executable
+local function setup()
 	if vim.fn.executable("jq") == 0 then
-		-- If jq is not found, throw an error message
-		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Please install 'jq' to use this plugin.")
+		print("Error: 'jq' is not installed. Please install 'jq' to use this plugin.")
 		return
 	end
-
-	print("Plugin setup complete")
 end
 
 -- Helper function to capitalize strings
 local function capitalize(str)
 	return (str:sub(1, 1):upper() .. str:sub(2))
-end
-
--- Function to format JSON using Prettier
-local function format_json_file(launch_json_path)
-	-- Check if prettier is available before running the formatting command
-	if vim.fn.executable("jq") == 1 then
-		-- Format the launch.json file using jq
-		vim.cmd("edit " .. launch_json_path)
-		-- Run :%!jq to format the content with jq
-		vim.cmd("%!jq")
-		print("Formatted launch.json")
-	else
-		-- Error message if prettier is not installed
-		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Cannot format JSON.")
-	end
 end
 
 -- Function to detect the current file's language
@@ -113,71 +94,53 @@ local function add_debug_configuration()
 		end
 	end
 
-	-- Try to open the launch.json file
-	local file, err = io.open(launch_json_path, "r")
-	if not file then
-		-- If the file doesn't exist, create it with default content
-		file, err = io.open(launch_json_path, "w")
-		if not file then
-			print("Error creating launch.json: " .. err)
-			return
-		end
-		file:write([[{
-  "version": "0.2.0",
-  "configurations": []
-}]])
-		file:close()
-		-- Reopen the file for reading after creation
-		file, err = io.open(launch_json_path, "r")
-		if not file then
-			print("Error reopening launch.json after creation: " .. err)
-			return
-		end
+	-- Detect the current file's language
+	local language = detect_language()
+	local debug_config = add_debug_configuration_for_language(language)
+	if not debug_config then
+		return -- If no debug configuration was added, return early
 	end
 
-	-- Read the file content
-	local content = file:read("*a")
-	file:close()
+	-- Open the .vscode/launch.json buffer or create a new one if it doesn't exist
+	local buf_exists = vim.fn.filereadable(launch_json_path) == 1
 
-	-- Decode JSON content
-	local launch_data = vim.json.decode(content)
+	-- Read the current contents or create a default table if the file does not exist
+	local launch_data
+	if buf_exists then
+		vim.cmd("edit " .. launch_json_path) -- Open the launch.json in the current buffer
+		local buf_content = table.concat(vim.api.nvim_buf_get_lines(0, 0, -1, false), "\n")
+		launch_data = vim.json.decode(buf_content) or {}
+	else
+		launch_data = { version = "0.2.0", configurations = {} }
+		vim.cmd("edit " .. launch_json_path) -- Open (and create) the file if it does not exist
+	end
 
 	-- Ensure "configurations" exists in the JSON
 	if not launch_data.configurations then
 		launch_data.configurations = {}
 	end
 
-	-- Detect the current file's language
-	local language = detect_language()
+	-- Add the new debug configuration
+	table.insert(launch_data.configurations, debug_config)
 
-	-- Get the language-specific debug configuration
-	local debug_config = add_debug_configuration_for_language(language)
-	if debug_config then
-		-- Add the debug configuration
-		table.insert(launch_data.configurations, debug_config)
-	else
-		return -- If no debug configuration was added, return early
-	end
-
-	-- Encode JSON content
+	-- Encode the updated table back into JSON
 	local updated_content = vim.json.encode(launch_data)
-
-	-- Write the updated JSON content back to the file
-	file, err = io.open(launch_json_path, "w")
-	if not file then
-		print("Error opening file for writing: " .. err)
-		return
+	if vim.fn.executable("jq") == 1 then
+		updated_content = vim.fn.system("echo '" .. updated_content .. "' | jq .")
+	else
+		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Cannot format JSON.")
 	end
-	file:write(updated_content)
-	file:close()
 
-	-- Format the launch.json file using Prettier
-	format_json_file(launch_json_path)
+	-- Write the updated content back to the buffer
+	vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(updated_content, "\n"))
 
 	print(language .. " debug configuration added to " .. launch_json_path)
 end
 
--- Main function to trigger adding the debug configuration
+function M.setup()
+	setup()
+end
+
 function M.add_debug_configuration()
 	add_debug_configuration()
 end
