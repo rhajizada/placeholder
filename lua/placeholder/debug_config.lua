@@ -1,5 +1,13 @@
 local M = {}
 
+-- Setup function for the plugin
+local function setup()
+	if vim.fn.executable("jq") == 0 then
+		print("Error: 'jq' is not installed. Please install 'jq' to use this plugin.")
+		return
+	end
+end
+
 -- Helper function to capitalize strings
 local function capitalize(str)
 	return (str:sub(1, 1):upper() .. str:sub(2))
@@ -117,13 +125,22 @@ local function add_debug_configuration()
 
 	-- Encode the updated table back into JSON
 	local updated_content = vim.json.encode(launch_data)
+	if vim.fn.executable("jq") == 1 then
+		updated_content = vim.fn.system("echo '" .. updated_content .. "' | jq .")
+	else
+		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Cannot format JSON.")
+	end
+
 	-- Write the updated content back to the buffer
 	vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(updated_content, "\n"))
 
 	print(language .. " debug configuration added to " .. launch_json_path)
 end
 
--- Main function to trigger adding the debug configuration
+function M.setup()
+	setup()
+end
+
 function M.add_debug_configuration()
 	add_debug_configuration()
 end

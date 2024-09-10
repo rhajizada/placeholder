@@ -2,7 +2,7 @@ local M = {}
 
 -- Default configuration options
 M.options = {
-	keymap = "<leader>cj",
+	keymap = "<leader>dj",
 }
 
 -- Setup function to allow users to override default configuration
