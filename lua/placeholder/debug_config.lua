@@ -26,7 +26,7 @@ local dap_config_types = {
 	go = "go",
 	cpp = "cppdbg",
 	c = "cppdbg",
-	rust = "lldb",
+	rust = "codelldb",
 	java = "java",
 	php = "php",
 	lua = "lua",
@@ -36,10 +36,10 @@ local dap_config_types = {
 	elixir = "elixir",
 	haskell = "haskell",
 	kotlin = "java",
-	swift = "lldb",
+	swift = "codelldb",
 	powershell = "PowerShell",
 	perl = "perl",
-	zig = "lldb",
+	zig = "codelldb",
 	d = "cppdbg",
 	fortran = "cppdbg",
 	erlang = "erlang",
@@ -49,7 +49,7 @@ local dap_config_types = {
 -- Find the root of the project by searching for the .git directory
 local function find_git_root()
 	local path = vim.fn.expand("%:p:h")
-	while path and path ~= "" do
+	while path and path ~= "" and path ~= "/" do
 		if vim.fn.isdirectory(path .. "/.git") == 1 then
 			return path
 		end
