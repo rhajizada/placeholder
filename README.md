@@ -12,7 +12,13 @@ use {
   'rhajizada/placeholder',
   config = function()
     require('placeholder').setup({
-      keymap = "<leader>dj" -- Customize keymap (optional)
+      keymap = "<leader>cj", -- Customize keymap,
+      console = "internalConsole", -- Customize console
+      -- Customize debug configuration types for different languages
+      dap_config_types = {
+        go = "go",
+        python = "debugpy",
+      }
     })
   end
 }
