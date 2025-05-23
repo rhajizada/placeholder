@@ -3,12 +3,16 @@ local M = {}
 -- Default configuration options
 M.options = {
 	keymap = "<leader>cj",
-	console = "integratedTerminal",
 	dap_config_types = {
-		go = "go",
-		javascript = "pwa-node",
-		python = "debugpy",
-		typescript = "pwa-node",
+		go = {
+			debugger = "go",
+		},
+		python = {
+			debugger = "debugpy",
+		},
+		lua = {
+			debugger = "nlua",
+		},
 	},
 }
 

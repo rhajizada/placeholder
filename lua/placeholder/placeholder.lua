@@ -4,7 +4,7 @@ local config = require("placeholder.config") -- Import the config module
 -- Setup function for the plugin
 local function setup()
 	if vim.fn.executable("jq") == 0 then
-		print("Error: 'jq' is not installed. Please install 'jq' to use this plugin.")
+		vim.notify("'jq' is not installed", vim.log.levels.ERROR)
 		return
 	end
 end
@@ -33,23 +33,59 @@ end
 
 -- Function to add a language-specific debug configuration to launch.json
 local function add_debug_configuration_for_language(language)
-	local debugger_type = config.options.dap_config_types[language]
-	local console = config.options.console
+	local selected_config = config.options.dap_config_types[language]
 
-	if not debugger_type then
-		print("Error: No DAP configuration found for " .. language)
+	if not selected_config then
+		vim.notify("No DAP configuration specified for " .. language, vim.log.levels.ERROR)
 		return
 	end
 
 	local bp = vim.fn.fnamemodify(vim.fn.expand("%"), ":.")
-	return {
-		name = string.format("%s: %s", capitalize(language), bp),
-		type = debugger_type,
-		request = "launch",
-		program = string.format("${workspaceFolder}/%s", bp),
-		args = {},
+	local name = selected_config.name or string.format("%s: %s", capitalize(language), bp)
+	local dap_type = selected_config.debugger
+	local program = selected_config.program or string.format("${workspaceFolder}/%s", bp)
+	local console = selected_config.console or "internalConsole"
+	local request = selected_config.request or "launch"
+	local args = selected_config.args or {}
+
+	local debug_config = {
+		name = name,
+		type = dap_type,
+		request = request,
+		program = program,
+		args = args,
 		console = console,
 	}
+
+	local extra_keys = {
+		"code",
+		"cwd",
+		"env",
+		"module",
+		"mainClass",
+		"vmArgs",
+		"projectName",
+		"stopOnEntry",
+		"stepFilters",
+		"hostName",
+		"port",
+		"processId",
+		"django",
+		"gevent",
+		"jinja",
+		"justMyCode",
+		"stopAtBeginningOfMainSubprogram",
+		"pid",
+		"target",
+	}
+
+	for _, key in ipairs(extra_keys) do
+		if selected_config[key] ~= nil then
+			debug_config[key] = selected_config[key]
+		end
+	end
+
+	return debug_config
 end
 
 -- Function to add a debug configuration to launch.json
@@ -61,7 +97,8 @@ local function add_debug_configuration()
 	if vim.fn.isdirectory(vscode_dir) == 0 then
 		local ok, err = vim.fn.mkdir(vscode_dir, "p")
 		if ok == 0 then
-			print("Error creating .vscode directory: " .. err)
+			local msg = "Failed to create '.vscode' directory: " .. err
+			vim.notify(msg, vim.log.levels.ERROR)
 			return
 		end
 	end
@@ -93,11 +130,12 @@ local function add_debug_configuration()
 	if vim.fn.executable("jq") == 1 then
 		updated_content = vim.fn.system("echo '" .. updated_content .. "' | jq .")
 	else
-		vim.api.nvim_err_writeln("Error: 'jq' is not installed. Cannot format JSON.")
+		vim.notify("'jq' is not installed", vim.log.levels.ERROR)
 	end
 
 	vim.api.nvim_buf_set_lines(0, 0, -1, false, vim.split(updated_content, "\n"))
-	print(language .. " debug configuration added to " .. launch_json_path)
+	local msg = string.format("Debug confiration '%s' added to '%s'", debug_config.name, launch_json_path)
+	vim.notify(msg, vim.log.levels.INFO)
 end
 
 function M.setup()
